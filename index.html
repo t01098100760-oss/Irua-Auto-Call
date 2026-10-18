@@ -1,0 +1,145 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>여수 대리 콜 조건 검사</title>
+<style>
+body{font-family:sans-serif;background:#f2f5fa;margin:0;padding:18px;color:#172338}
+main{max-width:600px;margin:auto}
+h2{margin:12px 0}
+section{background:white;border-radius:16px;padding:18px;margin:14px 0}
+label{display:block;margin-top:13px;font-weight:bold}
+input{box-sizing:border-box;width:100%;padding:12px;margin-top:5px;font-size:17px;border:1px solid #ccd3df;border-radius:9px}
+button{width:100%;padding:15px;margin-top:15px;border:0;border-radius:10px;background:#175bd5;color:white;font-size:18px;font-weight:bold}
+#result{font-size:19px;font-weight:bold;white-space:pre-line}
+.ok{color:#087c46}.no{color:#c22c37}
+small{color:#667085}
+</style>
+</head>
+<body>
+<main>
+<h2>여수 대리 콜 조건 검사</h2>
+<small>가상 검사 전용 · 실제 카카오T 자동 수락 기능 없음</small>
+
+<section>
+<label>도착지</label>
+<input id="dest" value="여수시 돌산읍">
+
+<label>실제수익 (원)</label>
+<input id="pay" type="number" value="23200">
+
+<label>픽업 거리 (km)</label>
+<input id="distance" type="number" step="0.1" value="2.5">
+
+<label>승객 탑승 후 운행시간 (분)</label>
+<input id="minutes" type="number" step="0.1" value="25">
+
+<label>검사 시각 (한국시간)</label>
+<input id="clock" type="time" value="23:00">
+
+<button onclick="check()">조건 검사</button>
+<button onclick="setNow()">현재 한국시간 적용</button>
+</section>
+
+<section>
+<div id="result">조건 검사 버튼을 눌러주세요.</div>
+</section>
+
+<section>
+<h3>가상 콜 자동 시험</h3>
+<small>2초마다 예시 콜을 하나씩 검사합니다. 실제 콜에는 접근하지 않습니다.</small>
+<button id="start" onclick="toggleTest()">가상 시험 시작</button>
+<div id="log"></div>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const examples=[
+["여수시 소라면",13000,2.1,10],
+["여수시 화양면",18000,2,20],
+["여수시 돌산읍",23200,2.5,25],
+["여수시 남면",14000,3.5,12],
+["여수시 율촌면",15000,4.5,8],
+["순천시 연향동",35000,1.2,20],
+["여수시 학동",17999,2,20],
+["여수시 학동",18000,2,20]
+];
+let timer=null,index=0;
+
+function setNow(){
+const time=new Intl.DateTimeFormat("en-GB",{
+timeZone:"Asia/Seoul",hour:"2-digit",
+minute:"2-digit",hourCycle:"h23"
+}).format(new Date());
+$("clock").value=time;
+}
+
+function evaluate(dest,pay,km,min,time){
+if(!dest||!Number.isFinite(pay)||!Number.isFinite(km)||
+!Number.isFinite(min)||!time||min<=0||km<0||pay<0){
+return [false,"필수 정보가 없거나 잘못되었습니다."];
+}
+if(!/(여수시|^여수[^\s]*)/.test(dest)){
+return [false,"여수시 도착이 아닙니다."];
+}
+if(pay<13000)return [false,"실제수익 13,000원 미만"];
+const hour=Number(time.split(":")[0]);
+const limit=(hour>=23||hour<6)?4:3;
+if(km>limit)return [false,"픽업 거리 "+limit+"km 초과"];
+if(min>10&&pay<900*min){
+return [false,"장거리 분당 900원 미만"];
+}
+return [true,min<=10?"단거리 공통조건 충족":
+"장거리 분당 "+Math.round(pay/min)+"원"];
+}
+
+function check(){
+const dest=$("dest").value.trim();
+const pay=Number($("pay").value);
+const km=Number($("distance").value);
+const min=Number($("minutes").value);
+const time=$("clock").value;
+const missing=["pay","distance","minutes"].some(
+id=>$(id).value.trim()===""
+);
+const [ok,reason]=missing?
+[false,"금액·거리·시간을 모두 입력하세요."]:
+evaluate(dest,pay,km,min,time);
+$("result").className=ok?"ok":"no";
+$("result").textContent=
+(ok?"✅ 수락 조건 충족":"❌ 제외")+"\n"+reason;
+return [ok,reason];
+}
+
+function toggleTest(){
+if(timer){
+clearInterval(timer);timer=null;
+$("start").textContent="가상 시험 시작";
+return;
+}
+$("log").textContent="";
+index=0;
+$("start").textContent="가상 시험 중지";
+timer=setInterval(()=>{
+const e=examples[index%examples.length];
+$("dest").value=e[0];
+$("pay").value=e[1];
+$("distance").value=e[2];
+$("minutes").value=e[3];
+const [ok,reason]=check();
+const line=document.createElement("p");
+line.textContent=(ok?"✅ ":"❌ ")+e[0]+
+" / "+e[1].toLocaleString()+"원 / "+
+e[2]+"km / "+e[3]+"분 — "+reason;
+$("log").prepend(line);
+index++;
+if(index>=examples.length)toggleTest();
+},2000);
+}
+setNow();
+</script>
+</body>
+</html>
